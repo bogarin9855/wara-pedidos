@@ -179,6 +179,7 @@ function arrancar(){
     if(d.dias&&d.dias.length)DIAS=d.dias;
     if(d.postres)POSTRES=d.postres;
     if(d.colaboradores&&d.colaboradores.length)COLABS=d.colaboradores;
+    COLABS.sort((a,b)=>a.n.localeCompare(b.n,'es'));
     if(d.sectores&&d.sectores.length)SECTORES=d.sectores;
     PEDIDOS=d.pedidos||[]; AUSENTES=d.ausentes||[];
     render();
@@ -275,6 +276,7 @@ let COLABS = [
   {n:"Stella Tuma", s:"PLANTA"},
   {n:"Virgilio Coria", s:"PLANTA"}
 ];
+COLABS.sort((a,b)=>a.n.localeCompare(b.n,'es'));
 let SECTORES = ["JURAMENTO","PLANTA"];
 function sectorDe(nombre){const c=COLABS.find(x=>x.n===nombre);return c?c.s:'';}
 function esRotativo(nombre){return sectorDe(nombre)==="PLANTA / JURAMENTO";}
