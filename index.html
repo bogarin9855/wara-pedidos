@@ -160,7 +160,7 @@ document.getElementById('brandlogo').src=LOGO;
 /* ============ CONEXIÓN REAL (Google) ============ */
 // Vacío = modo local (no guarda; sirve para probar la pantalla).
 // Pegá acá la URL del Web App de Apps Script para activar el modo real.
-const API_URL="";
+const API_URL="https://script.google.com/macros/s/AKfycbylynEVpJc-nCqnPqUy4-aATojTwM_GBPlf3-We0EJ2Nuta-nqovdKqJUS2nADZXubi/exec";
 async function guardarPedido(p){ if(!API_URL)return;
   try{ await fetch(API_URL,{method:"POST",body:JSON.stringify({accion:"pedido",nombre:p.nombre,sector:p.sector,dias:p.dias})}); }catch(e){}
 }
