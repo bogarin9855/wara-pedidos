@@ -111,15 +111,16 @@
   /* Planilla imprimible */
   .printonly{display:none}
   @media print{
-    html,body{background:#fff!important}
+    html,body{background:#fff!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
     .wrap,.navbar{display:none!important}
     .printonly{display:block!important}
     @page{size:A4;margin:13mm}
     .pblock.brk{page-break-after:always}
-    .pbrand{display:flex;align-items:center;gap:10px}
-    .pbrand img{width:46px;height:46px;border-radius:50%;object-fit:cover}
-    .pbrand span{font-family:'Figtree',sans-serif;font-size:12px;color:#5a7a3c;font-weight:700;letter-spacing:.5px}
-    .ptitle{font-size:16px;font-weight:800;color:#2B2A22;margin-top:3px}
+    .pbrand{display:flex;align-items:center;gap:11px;border-bottom:2px solid #5E8F3C;padding-bottom:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .pbrand img{width:48px;height:48px;border-radius:50%;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .pbrand .pname{font-family:'Fraunces',serif;font-weight:700;font-size:24px;color:#2E5A28;line-height:1}
+    .pbrand .ptag{font-family:'Figtree',sans-serif;font-size:11px;color:#5a7a3c;font-weight:700;letter-spacing:.5px;display:block;margin-top:2px}
+    .ptitle{font-size:16px;font-weight:800;color:#2B2A22;margin-top:8px}
     .pmeta{font-size:12px;color:#444;margin:4px 0 11px}
     .ptable{width:100%;border-collapse:collapse;font-size:12px}
     .ptable th,.ptable td{border:1px solid #8a8a8a;padding:7px 8px;text-align:left;vertical-align:top}
@@ -472,9 +473,8 @@ function renderListo(){
     <h2 class="title">¡Pedido enviado!</h2>
     <p class="sub">Gracias ${pedido.nombre.split(' ')[0]}. El menú quedó registrado para la ${SEMANA.toLowerCase()}.</p></div>
     <p class="footnote">¿Un compañero no tiene el celu a mano? Podés cargar su pedido<br>desde acá mismo, sin reabrir el link.</p>`;
-  navbar.innerHTML=`<div class="inner" style="flex-direction:column">
-    <button class="btn prim" style="width:100%" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button>
-    <button class="btn" style="width:100%;background:transparent;color:var(--green-deep)" onclick="setTab('admin')">Ver Panel Wara</button></div>`;
+  navbar.innerHTML=`<div class="inner">
+    <button class="btn prim" style="width:100%" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button></div>`;
 }
 function otroPedido(){pedido={nombre:"",sector:"",dias:{}};avisoDia='';view='welcome';render();}
 function renderCerrado(){
@@ -572,7 +572,7 @@ function imprimirPlanilla(){
         <td><b>${s.m} · ${CATS[s.m].n}</b><span class="dishsm">${d.platos[s.m]}</span></td>
         <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td></td></tr>`;}).join('');
       blocks.push(`<div class="phead">
-          <div class="pbrand"><img src="${LOGO}" alt="Wara"><span>Comida saludable · Salta</span></div>
+          <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
           <div class="ptitle">Planilla de entrega — ${d.nombre}</div>
           <div class="pmeta">Sucursal: <b>${sec}</b> · ${SEMANA} · Total: <b>${list.length}</b> viandas</div>
         </div>
