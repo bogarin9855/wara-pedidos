@@ -485,7 +485,11 @@ function confirmar(){
   const elegidos=DIAS.filter(d=>{const s=pedido.dias[d.k];return s&&s.m&&!s.skip;}).length;
   if(elegidos===0){avisoDia='Todavía no elegiste ningún menú. Tocá una opción para empezar 👆';view='dia0';render();return;}
   PEDIDOS=PEDIDOS.filter(p=>p.nombre!==pedido.nombre);
-  const dias={};Object.keys(pedido.dias).forEach(k=>{const s=pedido.dias[k];if(s&&s.m&&!s.skip)dias[k]={m:s.m,p:s.p};});
+  const dias={};Object.keys(pedido.dias).forEach(k=>{
+    const s=pedido.dias[k];
+    if(s&&s.skip) dias[k]={skip:true};           // eligió "No pido este día"
+    else if(s&&s.m) dias[k]={m:s.m,p:s.p};       // eligió un menú
+  });
   const nuevo={nombre:pedido.nombre,sector:pedido.sector,dias};
   PEDIDOS.push(nuevo);
   guardarPedido(nuevo);
@@ -589,16 +593,20 @@ function imprimirPlanilla(){
   DIAS.forEach(d=>{
     const pe=PEDIDOS.filter(p=>p.dias[d.k]);
     SECTORES.forEach(sec=>{
-      const list=pe.filter(p=>p.sector===sec).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+      const list=pe.filter(p=>p.sector===sec).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
       if(!list.length)return;
+      const viandas=list.filter(p=>p.dias[d.k]&&!p.dias[d.k].skip).length;
       const rows=list.map((p,i)=>{const s=p.dias[d.k];
+        if(s&&s.skip) return `<tr><td class="c0">${i+1}</td><td>${p.nombre}</td>
+          <td colspan="2" style="color:#888;font-style:italic">No pide este día</td>
+          <td class="cchk">—</td><td></td></tr>`;
         return `<tr><td class="c0">${i+1}</td><td>${p.nombre}</td>
-        <td><b>${s.m} · ${CATS[s.m].n}</b><span class="dishsm">${d.platos[s.m]}</span></td>
-        <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td></td></tr>`;}).join('');
+          <td><b>${s.m} · ${CATS[s.m].n}</b><span class="dishsm">${d.platos[s.m]}</span></td>
+          <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td></td></tr>`;}).join('');
       blocks.push(`<div class="phead">
           <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
           <div class="ptitle">Planilla de entrega — ${d.nombre}</div>
-          <div class="pmeta">Sucursal: <b>${sec}</b> · ${SEMANA} · Total: <b>${list.length}</b> viandas</div>
+          <div class="pmeta">Sucursal: <b>${sec}</b> · ${SEMANA} · Viandas a entregar: <b>${viandas}</b></div>
         </div>
         <table class="ptable"><thead><tr>
           <th class="c0">#</th><th>Colaborador</th><th>Menú</th><th>Postre</th><th class="cchk">Entregado</th><th>Observaciones</th>
