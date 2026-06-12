@@ -529,18 +529,21 @@ function renderAdmin(){
   const days=DIAS.map(d=>{
     const pe=PEDIDOS.filter(p=>p.dias[d.k]);
     const cook={};const post={};
-    pe.forEach(p=>{const s=p.dias[d.k];cook[s.m]=(cook[s.m]||0)+1;if(s.p&&s.p!=='NO')post[s.p]=(post[s.p]||0)+1;});
+    pe.forEach(p=>{const s=p.dias[d.k];if(!s||s.skip||!s.m)return;cook[s.m]=(cook[s.m]||0)+1;if(s.p&&s.p!=='NO')post[s.p]=(post[s.p]||0)+1;});
+    const viandas=pe.filter(p=>{const s=p.dias[d.k];return s&&!s.skip&&s.m;}).length;
     const cookRows=Object.keys(cook).sort().map(k=>
-      `<div class="cookrow"><b>${k} · ${CATS[k].n}</b><span class="q">${cook[k]}</span></div>`).join('')||'<div class="cookrow"><span style="color:var(--muted)">Sin pedidos</span></div>';
+      `<div class="cookrow"><b>${k} · ${CATS[k]?CATS[k].n:''}</b><span class="q">${cook[k]}</span></div>`).join('')||'<div class="cookrow"><span style="color:var(--muted)">Sin pedidos</span></div>';
     const postRows=Object.keys(post).sort().map(k=>
-      `<div class="cookrow"><b>${POSTRES[k]}</b><span class="q">${post[k]}</span></div>`).join('');
+      `<div class="cookrow"><b>${POSTRES[k]||k}</b><span class="q">${post[k]}</span></div>`).join('');
     const delivBy=SECTORES.map(sec=>{
       const list=pe.filter(p=>p.sector===sec);if(!list.length)return'';
       return `<div class="h">Entrega · ${sec} (${list.length})</div>`+list.map(p=>{
-        const s=p.dias[d.k];return `<div class="p"><input type="checkbox"><span class="who">${p.nombre}</span>
+        const s=p.dias[d.k];
+        if(s&&s.skip)return `<div class="p"><input type="checkbox" disabled><span class="who" style="color:var(--muted)">${p.nombre}</span><span class="what" style="font-style:italic">no pide</span></div>`;
+        return `<div class="p"><input type="checkbox"><span class="who">${p.nombre}</span>
         <span class="what">#${s.m} · ${s.p==='NO'?'sin postre':s.p?s.p:'—'}</span></div>`;}).join('');}).join('');
     return `<details class="adminday">
-      <summary>${d.nombre}<span class="pill">${pe.length} viandas</span></summary>
+      <summary>${d.nombre}<span class="pill">${viandas} viandas</span></summary>
       <div class="adminbody">
         <div class="seclabel">A cocinar</div>
         <div class="cook">${cookRows}${postRows?'<div style="height:8px"></div>'+postRows:''}</div>
@@ -601,7 +604,7 @@ function imprimirPlanilla(){
           <td colspan="2" style="color:#888;font-style:italic">No pide este día</td>
           <td class="cchk">—</td><td></td></tr>`;
         return `<tr><td class="c0">${i+1}</td><td>${p.nombre}</td>
-          <td><b>${s.m} · ${CATS[s.m].n}</b><span class="dishsm">${d.platos[s.m]}</span></td>
+          <td><b>${s.m} · ${CATS[s.m]?CATS[s.m].n:''}</b><span class="dishsm">${d.platos[s.m]||''}</span></td>
           <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td></td></tr>`;}).join('');
       blocks.push(`<div class="phead">
           <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
