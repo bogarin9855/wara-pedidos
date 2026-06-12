@@ -323,10 +323,16 @@ const CLAVE_PRUEBA="pruebawara";
   else if(q.indexOf('modo=cerrado-'+CLAVE_PRUEBA)>=0) MODO='cerrado';
 })();
 function ahoraArg(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));}
-function parseArg(s){ // "2026-06-12 12:00" interpretado como hora de Argentina
+function parseArg(s){ // soporta "yyyy-MM-dd HH:mm" y "dd/MM/yyyy HH:mm:ss"
   if(!s)return null;
-  const m=String(s).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/);
-  return m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]) : null;
+  const s2=String(s).trim();
+  // formato ISO: 2026-06-12 12:00
+  let m=s2.match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
+  // formato Sheets: 12/06/2026 12:00:00
+  m=s2.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})[ T](\d{1,2}):(\d{2})/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]);
+  return null;
 }
 const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 function fechaTxt(dt){
