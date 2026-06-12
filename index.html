@@ -176,8 +176,12 @@ function arrancar(){
   main.innerHTML='<p style="padding:48px 20px;text-align:center;color:var(--muted)">Cargando menú de la semana…</p>';
   fetch(API_URL).then(r=>r.json()).then(d=>{
     if(d.semana)SEMANA=d.semana;
-    if(d.apertura)APERTURA=d.apertura; if(d.cierre)CIERRE=d.cierre;
+    ABRE=parseArg(d.abre); CIERRA=parseArg(d.cierra);
+    APERTURA=fechaTxt(ABRE)||"viernes 12:00";
+    CIERRE=fechaTxt(CIERRA)||"domingo 23:00";
+    if(d.dias_activos){DIAS_ACTIVOS=String(d.dias_activos).split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);}
     if(d.dias&&d.dias.length)DIAS=d.dias;
+    if(DIAS_ACTIVOS&&DIAS_ACTIVOS.length)DIAS=DIAS.filter(x=>DIAS_ACTIVOS.indexOf(x.k)>=0);
     if(d.postres)POSTRES=d.postres;
     if(d.colaboradores&&d.colaboradores.length)COLABS=d.colaboradores;
     COLABS.sort((a,b)=>a.n.localeCompare(b.n,'es'));
@@ -302,9 +306,12 @@ function setTab(t){tab=t;claveErr='';document.getElementById('tab-order').classL
 }
 
 /* ============ VENTANA DE PEDIDOS ============ */
-// Abre viernes 12:00 · Cierra domingo 23:00 (hora de Argentina)
-let APERTURA="viernes 12:00", CIERRE="domingo 23:00";
-// 'auto' = abre/cierra solo según el reloj (viernes 12:00 → domingo 23:00).
+// Texto que se muestra (se arma solo desde las fechas de la planilla)
+let APERTURA="", CIERRE="";
+// Fecha-hora exactas de apertura y cierre (vienen de la pestaña Config: abre / cierra)
+let ABRE=null, CIERRA=null;
+// Días que se trabajan esa semana (ej. ["MAR","MIE","JUE","VIE"]). null = todos los del menú.
+let DIAS_ACTIVOS=null;
 let MODO='auto';
 // Interruptor de prueba por link (solo lo conocés vos). Para sacarlo al terminar la prueba,
 // cambiá o vaciá CLAVE_PRUEBA. El colaborador con el link normal NUNCA puede cambiar el horario.
@@ -315,13 +322,24 @@ const CLAVE_PRUEBA="pruebawara";
   if(q.indexOf('modo=abierto-'+CLAVE_PRUEBA)>=0) MODO='abierto';
   else if(q.indexOf('modo=cerrado-'+CLAVE_PRUEBA)>=0) MODO='cerrado';
 })();
+function ahoraArg(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));}
+function parseArg(s){ // "2026-06-12 12:00" interpretado como hora de Argentina
+  if(!s)return null;
+  const m=String(s).trim().match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})/);
+  return m ? new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]) : null;
+}
+const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function fechaTxt(dt){
+  if(!dt)return '';
+  const dd=('0'+dt.getDate()).slice(-2), mm=('0'+(dt.getMonth()+1)).slice(-2);
+  const hh=('0'+dt.getHours()).slice(-2), mi=('0'+dt.getMinutes()).slice(-2);
+  return DOW[dt.getDay()]+' '+dd+'/'+mm+', '+hh+':'+mi;
+}
 function ventanaReal(){
-  const n=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));
-  const d=n.getDay(), h=n.getHours()+n.getMinutes()/60;
-  if(d===5)return h>=12;      // viernes desde 12:00
-  if(d===6)return true;        // sábado todo el día
-  if(d===0)return h<23;        // domingo hasta 23:00
-  return false;
+  if(ABRE&&CIERRA){ const n=ahoraArg(); return n>=ABRE && n<CIERRA; }
+  // Respaldo por día de semana si no hay fechas cargadas
+  const n=ahoraArg(), d=n.getDay(), h=n.getHours()+n.getMinutes()/60;
+  if(d===5)return h>=12; if(d===6)return true; if(d===0)return h<23; return false;
 }
 function estaAbierto(){return MODO==='abierto'?true:MODO==='cerrado'?false:ventanaReal();}
 
@@ -451,7 +469,7 @@ function renderResumen(){
     <div class="sumcard">${rows}</div>
     <p class="footnote">Si algo está mal, tocá ← para volver y corregirlo.<br>Los días en blanco se toman como "no pide".</p>`;
   navbar.innerHTML=`<div class="inner">
-    <button class="btn ghost" onclick="atras(5)">←</button>
+    <button class="btn ghost" onclick="atras(DIAS.length)">←</button>
     <button class="btn prim" onclick="confirmar()">Enviar mi pedido ✓</button></div>`;
 }
 function confirmar(){
