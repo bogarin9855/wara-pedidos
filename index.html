@@ -294,7 +294,29 @@ let tab="order";
 let view="welcome";       // welcome | dia0..4 | resumen | listo
 let pedido={nombre:"",sector:"",dias:{}};
 let avisoDia='';
+let miPedidoNombre='';
 function postreTxt(p){return !p?'—':p==='NO'?'Sin postre':POSTRES[p];}
+function menuTxt(m){return CATS[m]?('Menú '+CATS[m].n):('Menú '+m);}
+function platoDe(dk,m){const d=DIAS.find(x=>x.k===dk);return d&&d.platos[m]?d.platos[m]:'';}
+// Resumen corto para el aviso: "Martes: Menú Ejecutivo + Flan"
+function resumenCorto(p){
+  return DIAS.filter(d=>p.dias[d.k]).map(d=>{
+    const s=p.dias[d.k];
+    if(s.skip)return `${d.nombre.split(' ')[0]}: no pide`;
+    return `${d.nombre.split(' ')[0]}: ${menuTxt(s.m)}${s.p?' + '+postreTxt(s.p):''}`;
+  }).join(' · ')||'sin días cargados';
+}
+// Tarjeta de resumen completo (para ver/descargar)
+function resumenCard(p){
+  const rows=DIAS.filter(d=>p.dias[d.k]).map(d=>{
+    const s=p.dias[d.k];
+    let v;
+    if(s.skip)v=`<span style="color:var(--muted)">No pide este día</span>`;
+    else v=`${menuTxt(s.m)}<small>${platoDe(d.k,s.m)}${s.p?' · '+postreTxt(s.p):''}</small>`;
+    return `<div class="sumrow"><div class="d">${d.nombre}</div><div class="v">${v}</div></div>`;
+  }).join('')||`<div class="sumrow"><div class="v" style="color:var(--muted)">Sin días cargados</div></div>`;
+  return `<div class="sumcard">${rows}</div>`;
+}
 const main=document.getElementById('main');
 const navbar=document.getElementById('navbar');
 
@@ -352,6 +374,7 @@ function estaAbierto(){return MODO==='abierto'?true:MODO==='cerrado'?false:venta
 /* ============ RENDER ============ */
 function render(){window.scrollTo(0,0);
   if(tab==='admin'){if(!waraUnlocked)return renderGateWara();renderAdmin();return;}
+  if(view==='mipedido')return renderMiPedido();
   if(!estaAbierto()&&view!=='listo')return renderCerrado();
   if(view==='welcome')return renderWelcome();
   if(view.startsWith('dia'))return renderDia(parseInt(view.slice(3)));
@@ -363,7 +386,7 @@ function renderWelcome(){
   const ex=pedido.nombre?pedidoDe(pedido.nombre):null;
   let yaPidio='';
   if(ex){
-    const dets=DIAS.filter(d=>ex.dias[d.k]).map(d=>`${d.nombre.split(' ')[0]}: menú ${ex.dias[d.k].m}`).join(' · ')||'sin días cargados';
+    const dets=resumenCorto(ex);
     yaPidio=`<div class="aviso" style="margin-top:16px"><div>⚠️ <b>${pedido.nombre.split(' ')[0]}</b> ya cargó su pedido esta semana.<br><span style="font-weight:600;font-size:13.5px">Si seguís, lo vas a <b>modificar</b> (queda cargado lo nuevo). Pedido actual → ${dets}.</span></div></div>`;
   }
   const rot=pedido.nombre?esRotativo(pedido.nombre):false;
@@ -386,7 +409,8 @@ function renderWelcome(){
     <select id="nom"><option value="">Elegí tu nombre…</option>${COLABS.map(c=>`<option ${pedido.nombre===c.n?'selected':''}>${c.n}</option>`).join('')}</select>
     ${yaPidio}
     ${sucursalUI}
-    <p class="footnote" style="text-align:left;padding:18px 2px 0">🕐 Podés pedir desde el <b>${APERTURA}</b> hasta el <b>${CIERRE}</b>. Pasada esa hora se cierra y no se pueden hacer cambios.</p>`;
+    <p class="footnote" style="text-align:left;padding:18px 2px 0">🕐 Podés pedir desde el <b>${APERTURA}</b> hasta el <b>${CIERRE}</b>. Pasada esa hora se cierra y no se pueden hacer cambios.</p>
+    <div class="footnote"><span style="text-decoration:underline;cursor:pointer;color:var(--green-deep)" onclick="abrirMiPedido()">👁️ Ver / descargar mi pedido ya hecho</span></div>`;
   document.getElementById('nom').onchange=e=>pickNombre(e.target.value);
   navbar.innerHTML=`<div class="inner"><button class="btn prim" id="go" onclick="view='dia0';render()">${ex?'Modificar mi pedido':'Empezar'} &nbsp;→</button></div>`;
   updNav();
@@ -496,15 +520,44 @@ function confirmar(){
   view='listo';render();
 }
 function renderListo(){
+  const p=pedidoDe(pedido.nombre)||{nombre:pedido.nombre,sector:pedido.sector,dias:{}};
   main.innerHTML=`<div class="done-hero">
     <div class="circ">✓</div>
     <h2 class="title">¡Pedido enviado!</h2>
     <p class="sub">Gracias ${pedido.nombre.split(' ')[0]}. El menú quedó registrado para la ${SEMANA.toLowerCase()}.</p></div>
-    <p class="footnote">¿Un compañero no tiene el celu a mano? Podés cargar su pedido<br>desde acá mismo, sin reabrir el link.</p>`;
-  navbar.innerHTML=`<div class="inner">
-    <button class="btn prim" style="width:100%" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button></div>`;
+    <div class="seclabel">Tu pedido</div>
+    ${resumenCard(p)}
+    <p class="footnote">¿Un compañero no tiene el celu a mano? Podés cargar su pedido desde acá mismo.</p>`;
+  navbar.innerHTML=`<div class="inner" style="flex-direction:column">
+    <button class="btn prim" style="width:100%" onclick="descargarComprobante('${pedido.nombre.replace(/'/g,"\\'")}')">📥 Descargar mi pedido</button>
+    <button class="btn" style="width:100%;background:transparent;color:var(--green-deep)" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button></div>`;
 }
 function otroPedido(){pedido={nombre:"",sector:"",dias:{}};avisoDia='';view='welcome';render();}
+function renderMiPedido(){
+  const p=miPedidoNombre?pedidoDe(miPedidoNombre):null;
+  let cuerpo='';
+  if(!miPedidoNombre){
+    cuerpo=`<p class="sub">Elegí tu nombre para ver el pedido que cargaste esta semana.</p>
+      <select id="nomvp"><option value="">Elegí tu nombre…</option>${COLABS.map(c=>`<option ${miPedidoNombre===c.n?'selected':''}>${c.n}</option>`).join('')}</select>`;
+  }else if(!p){
+    cuerpo=`<select id="nomvp"><option value="">Elegí tu nombre…</option>${COLABS.map(c=>`<option ${miPedidoNombre===c.n?'selected':''}>${c.n}</option>`).join('')}</select>
+      <div class="aviso" style="margin-top:14px"><div>No encontramos un pedido de <b>${miPedidoNombre.split(' ')[0]}</b> esta semana.</div></div>`;
+  }else{
+    cuerpo=`<select id="nomvp"><option value="">Elegí tu nombre…</option>${COLABS.map(c=>`<option ${miPedidoNombre===c.n?'selected':''}>${c.n}</option>`).join('')}</select>
+      <p class="sub" style="margin-top:10px">${p.nombre} · ${p.sector}</p>
+      ${resumenCard(p)}`;
+  }
+  main.innerHTML=`<img src="${LOGO}" class="logo-big" alt="Wara">
+    <h2 class="title">Mi pedido de la semana</h2>
+    <p class="sub">${SEMANA}</p>
+    ${cuerpo}`;
+  const sel=document.getElementById('nomvp');
+  if(sel)sel.onchange=e=>{miPedidoNombre=e.target.value;render();};
+  navbar.innerHTML=`<div class="inner" style="flex-direction:column">
+    ${p?`<button class="btn prim" style="width:100%" onclick="descargarComprobante('${p.nombre.replace(/'/g,"\\'")}')">📥 Descargar mi pedido</button>`:''}
+    <button class="btn" style="width:100%;background:transparent;color:var(--green-deep)" onclick="salirMiPedido()">← Volver</button></div>`;
+}
+function salirMiPedido(){miPedidoNombre='';view='welcome';render();}
 function renderCerrado(){
   main.innerHTML=`
     <div class="statusbar closed">🔴 Pedidos cerrados por esta semana</div>
@@ -518,8 +571,9 @@ function renderCerrado(){
       <div class="sumrow"><div class="d">Cierra</div><div class="v">${CIERRE}</div></div>
     </div>
     <p class="footnote">Cuando se abra la próxima semana vas a poder pedir de nuevo desde este mismo link.</p>`;
-  navbar.innerHTML='';
+  navbar.innerHTML=`<div class="inner"><button class="btn prim" style="width:100%" onclick="abrirMiPedido()">👁️ Ver mi pedido de esta semana</button></div>`;
 }
+function abrirMiPedido(){miPedidoNombre='';view='mipedido';render();}
 
 /* ============ PANEL WARA (admin) ============ */
 function renderAdmin(){
@@ -620,6 +674,28 @@ function imprimirPlanilla(){
   const area=document.getElementById('printArea');
   area.innerHTML=blocks.map((b,i)=>`<section class="pblock${i<blocks.length-1?' brk':''}">${b}</section>`).join('')
     ||'<p style="padding:20px">Todavía no hay pedidos cargados.</p>';
+  window.print();
+}
+function descargarComprobante(nombre){
+  const p=pedidoDe(nombre);
+  if(!p)return;
+  const rows=DIAS.map(d=>{
+    const s=p.dias[d.k];
+    let menu, postre;
+    if(!s){menu='<span style="color:#999">—</span>';postre='—';}
+    else if(s.skip){menu='<span style="color:#999;font-style:italic">No pide este día</span>';postre='—';}
+    else{menu=`<b>${menuTxt(s.m)}</b><span class="dishsm">${platoDe(d.k,s.m)}</span>`;postre=postreTxt(s.p);}
+    return `<tr><td>${d.nombre}</td><td>${menu}</td><td>${postre}</td></tr>`;
+  }).join('');
+  const html=`<div class="phead">
+      <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
+      <div class="ptitle">Comprobante de pedido</div>
+      <div class="pmeta"><b>${p.nombre}</b> · ${p.sector} · ${SEMANA}</div>
+    </div>
+    <table class="ptable"><thead><tr><th>Día</th><th>Menú</th><th>Postre</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="pfoot">Pedido registrado. Ante cualquier cambio, escribí antes del cierre (${CIERRE}).</div>`;
+  document.getElementById('printArea').innerHTML=`<section class="pblock">${html}</section>`;
   window.print();
 }
 arrancar();
