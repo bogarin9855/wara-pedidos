@@ -198,7 +198,8 @@ function arrancar(){
 
 /* ============ ACCESOS (configurables) ============ */
 const CLAVE_WARA="wara2026";     // clave privada del panel (solo Wara)
-const LINK_PEDIDOS="(acá va el link de pedidos)"; // en real: la URL de Vercel
+const URL_PUBLICA="https://wara-pedidos.vercel.app"; // dirección pública de la página (cambiar acá si se migra a dominio propio)
+const LINK_PEDIDOS=URL_PUBLICA;  // alias retro-compatible; el recordatorio usa URL_PUBLICA
 const SESION_WARA="wara_panel_sesion"; // recuerda en localStorage que el panel ya se desbloqueó (corre en Vercel, no como artifact)
 let waraUnlocked=(function(){try{return localStorage.getItem(SESION_WARA)==='1';}catch(e){return false;}})();
 let claveErr='';
@@ -712,7 +713,7 @@ function copiarRecordatorio(){
   const pidieron=PEDIDOS.map(p=>p.nombre);
   const pend=COLABS.map(c=>c.n).filter(n=>!pidieron.includes(n)&&!AUSENTES.includes(n));
   const nombres=pend.map(c=>c.split(' ')[0]).join(', ');
-  const txt=`¡Hola! 🍽️ Recordá elegir tu menú de la semana antes de que cierre (${CIERRE}).\nEntrá acá 👉 ${LINK_PEDIDOS}\nTodavía faltan: ${nombres}.\n¡Gracias! 🙌`;
+  const txt=`¡Hola! 🍽️ Recordá elegir tu menú de la semana antes de que cierre (${CIERRE}).\nEntrá acá 👇\n${URL_PUBLICA}\nTodavía faltan: ${nombres}.\n¡Gracias! 🙌`;
   recordatorioListo=txt.replace(/\n/g,'<br>');
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).catch(()=>{});}
   render();
