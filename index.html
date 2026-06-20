@@ -199,7 +199,11 @@ function arrancar(){
 /* ============ ACCESOS (configurables) ============ */
 const CLAVE_WARA="wara2026";     // clave privada del panel (solo Wara)
 const LINK_PEDIDOS="(acá va el link de pedidos)"; // en real: la URL de Vercel
-let waraUnlocked=false, claveErr='';
+const SESION_WARA="wara_panel_sesion"; // recuerda en localStorage que el panel ya se desbloqueó (corre en Vercel, no como artifact)
+let waraUnlocked=(function(){try{return localStorage.getItem(SESION_WARA)==='1';}catch(e){return false;}})();
+let claveErr='';
+let panelTimer=null;            // intervalo de auto-refresco del panel (cada 60s); null = detenido
+let ultimaActualizacion='';     // hora de la última recarga de pedidos (ej "14:32")
 let AUSENTES=[];        // colaboradores marcados ausentes esta semana
 let recordatorioListo=''; // texto del recordatorio generado
 
@@ -327,8 +331,8 @@ const navbar=document.getElementById('navbar');
 
 function setTab(t){tab=t;claveErr='';document.getElementById('tab-order').classList.toggle('on',t==='order');
   document.getElementById('tab-admin').classList.toggle('on',t==='admin');
-  if(t==='order'){if(view==='listo'){}else{view='welcome';}}
-  if(t==='admin'&&waraUnlocked&&API_URL){refrescarPedidos().then(render);return;}
+  if(t==='order'){detenerAutoRefresco();if(view==='listo'){}else{view='welcome';}}
+  if(t==='admin'&&waraUnlocked&&API_URL){refrescarPanel().then(render);return;}
   render();
 }
 
@@ -449,11 +453,31 @@ function renderGateWara(){
   navbar.innerHTML=`<div class="inner"><button class="btn prim" onclick="tryWara()">Acceder al panel &nbsp;→</button></div>`;
   setTimeout(()=>inp.focus(),60);
 }
+function horaActual(){const d=ahoraArg();return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);}
+function refrescarPanel(){ // recarga pedidos desde la planilla, marca la hora y redibuja el panel (sin recargar la página)
+  return refrescarPedidos().then(()=>{ultimaActualizacion=horaActual();if(tab==='admin'&&waraUnlocked)render();});
+}
+function iniciarAutoRefresco(){ // arranca el intervalo de 60s; se asegura de no dejar duplicados
+  detenerAutoRefresco();
+  panelTimer=setInterval(()=>{
+    if(tab==='admin'&&waraUnlocked&&API_URL)refrescarPanel();
+    else detenerAutoRefresco();
+  },60000);
+}
+function detenerAutoRefresco(){if(panelTimer){clearInterval(panelTimer);panelTimer=null;}}
+function actualizarAhora(){if(API_URL)refrescarPanel();}
 function tryWara(){const v=(document.getElementById('clw').value||'').trim();
-  if(v===CLAVE_WARA){waraUnlocked=true;claveErr='';if(API_URL){refrescarPedidos().then(render);}else{render();}}
+  if(v===CLAVE_WARA){waraUnlocked=true;claveErr='';
+    try{localStorage.setItem(SESION_WARA,'1');}catch(e){}
+    if(API_URL){refrescarPanel();}else{render();}}
   else{claveErr='Clave incorrecta.';render();}
 }
-function bloquearPanel(){waraUnlocked=false;render();}
+function bloquearPanel(){waraUnlocked=false;detenerAutoRefresco();render();}
+function cerrarSesionWara(){ // olvida la sesión recordada y vuelve a pedir la clave
+  waraUnlocked=false;detenerAutoRefresco();
+  try{localStorage.removeItem(SESION_WARA);}catch(e){}
+  claveErr='';render();
+}
 
 function renderDia(i){
   const dia=DIAS[i];const sel=pedido.dias[dia.k]||{};
@@ -593,6 +617,7 @@ function abrirMiPedido(){miPedidoNombre='';view='mipedido';render();}
 /* ============ PANEL WARA (admin) ============ */
 function renderAdmin(){
   navbar.innerHTML='';
+  if(API_URL)iniciarAutoRefresco();
   const total=PEDIDOS.length;
   let totMenus=0;PEDIDOS.forEach(p=>totMenus+=Object.keys(p.dias).length);
   const days=DIAS.map(d=>{
@@ -636,6 +661,10 @@ function renderAdmin(){
     <div class="privbar">🔒 Vista privada de Wara · los colaboradores no ven esta sección</div>
     <h2 class="title">Panel Wara</h2>
     <p class="sub">${SEMANA} · consolidado automático</p>
+    <div style="display:flex;align-items:center;gap:11px;margin:-6px 0 16px">
+      <button class="btn prim" style="flex:none;padding:9px 15px;font-size:14px;border-radius:12px;box-shadow:none" onclick="actualizarAhora()">🔄 Actualizar</button>
+      <span style="font-size:13px;color:var(--muted);font-weight:600">${ultimaActualizacion?'Actualizado '+ultimaActualizacion:'Se actualiza solo cada 60 s'}</span>
+    </div>
     <div class="kpi">
       <div class="box"><b>${total}</b><span>ya pidieron</span></div>
       <div class="box"><b>${pendientes.length}</b><span>faltan pedir</span></div>
@@ -661,7 +690,10 @@ function renderAdmin(){
       <button class="btn" style="width:100%;background:var(--wine);color:#fff" onclick="empezarSemanaNueva()">🔄 Empezar semana nueva</button>
     </div>`:''}
     <p class="footnote">Wara Almacén Saludable · ${SEMANA}</p>
-    <div class="footnote"><span style="text-decoration:underline;cursor:pointer" onclick="bloquearPanel()">🔒 Bloquear panel</span></div>`;
+    <div class="footnote" style="display:flex;flex-direction:column;gap:11px;align-items:center">
+      <button class="btn" style="flex:none;background:transparent;border:2px solid var(--green-line);color:var(--green-deep);padding:11px 20px;font-size:14px;border-radius:12px" onclick="cerrarSesionWara()">🔓 Cerrar sesión</button>
+      <span style="text-decoration:underline;cursor:pointer" onclick="bloquearPanel()">🔒 Bloquear panel (sin olvidar la clave)</span>
+    </div>`;
 }
 function empezarSemanaNueva(){
   if(!confirm('¿Empezar una semana nueva?\n\nSe guarda una copia de los pedidos actuales y se limpia la toma para arrancar de cero. Esta acción no se puede deshacer desde acá.'))return;
