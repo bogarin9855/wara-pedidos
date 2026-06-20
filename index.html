@@ -105,6 +105,9 @@
   .prow .who{font-weight:700;font-size:15px}
   .prow .act{font-size:13px;font-weight:700;color:var(--green);cursor:pointer;white-space:nowrap;padding:4px 8px;border-radius:8px;background:var(--green-soft)}
   .recbox{background:var(--green-soft);border:1px solid var(--green-line);border-radius:12px;padding:12px 13px;font-size:14px;line-height:1.5;color:var(--ink);margin-top:12px}
+  .obs-input{width:100%;box-sizing:border-box}
+  .obsline{font-size:12.5px;color:#b06a00;background:#fff7ec;border-radius:8px;padding:4px 9px;margin:2px 0 8px 30px}
+  .modtag{display:inline-block;margin-left:6px;color:#b06a00;font-weight:800;font-size:13px}
   .fixedsec{background:var(--green-soft);border:2px solid var(--green-line);border-radius:15px;padding:14px 16px;font-weight:800;color:var(--green-deep);font-size:17px}
   .aviso{background:var(--orange-soft);color:#8a5a1c;border:1px solid #EAD2A8;border-radius:14px;padding:13px 15px;font-size:15px;font-weight:700;margin-bottom:14px;display:flex;gap:8px;align-items:center;animation:pop .25s ease}
   @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
@@ -296,14 +299,15 @@ let pedido={nombre:"",sector:"",dias:{}};
 let avisoDia='';
 let miPedidoNombre='';
 function postreTxt(p){return !p?'—':p==='NO'?'Sin postre':POSTRES[p];}
-function menuTxt(m){return CATS[m]?('Menú '+CATS[m].n):('Menú '+m);}
+function postreFull(p){return !p?'—':p==='NO'?'Sin postre':('Postre '+String(p).replace('P','')+' · '+(POSTRES[p]||''));}
+function menuTxt(m){return CATS[m]?('Menú '+m+' · '+CATS[m].n):('Menú '+m);}
 function platoDe(dk,m){const d=DIAS.find(x=>x.k===dk);return d&&d.platos[m]?d.platos[m]:'';}
-// Resumen corto para el aviso: "Martes: Menú Ejecutivo + Flan"
+// Resumen corto para el aviso: "Martes: Menú 1 · Ejecutivo + Postre 1 · Flan"
 function resumenCorto(p){
   return DIAS.filter(d=>p.dias[d.k]).map(d=>{
     const s=p.dias[d.k];
     if(s.skip)return `${d.nombre.split(' ')[0]}: no pide`;
-    return `${d.nombre.split(' ')[0]}: ${menuTxt(s.m)}${s.p?' + '+postreTxt(s.p):''}`;
+    return `${d.nombre.split(' ')[0]}: ${menuTxt(s.m)}${s.p?' + '+postreFull(s.p):''}${s.obs?' ('+s.obs+')':''}`;
   }).join(' · ')||'sin días cargados';
 }
 // Tarjeta de resumen completo (para ver/descargar)
@@ -312,7 +316,8 @@ function resumenCard(p){
     const s=p.dias[d.k];
     let v;
     if(s.skip)v=`<span style="color:var(--muted)">No pide este día</span>`;
-    else v=`${menuTxt(s.m)}<small>${platoDe(d.k,s.m)}${s.p?' · '+postreTxt(s.p):''}</small>`;
+    else v=`${menuTxt(s.m)}<small>${platoDe(d.k,s.m)} · ${postreFull(s.p)}</small>`;
+    if(s.obs)v+=`<small style="color:var(--orange);font-weight:700">📝 ${s.obs}</small>`;
     return `<div class="sumrow"><div class="d">${d.nombre}</div><div class="v">${v}</div></div>`;
   }).join('')||`<div class="sumrow"><div class="v" style="color:var(--muted)">Sin días cargados</div></div>`;
   return `<div class="sumcard">${rows}</div>`;
@@ -344,6 +349,10 @@ const CLAVE_PRUEBA="pruebawara";
   if(q.indexOf('modo=abierto-'+CLAVE_PRUEBA)>=0) MODO='abierto';
   else if(q.indexOf('modo=cerrado-'+CLAVE_PRUEBA)>=0) MODO='cerrado';
 })();
+// Herramientas de gestión solo para Lucas (no para Wara). Se activan agregando ?gestion=CLAVE al link.
+const CLAVE_ADMIN="bogarin";
+let ESLUCAS=false;
+(function(){ if(CLAVE_ADMIN && (location.search||'').toLowerCase().indexOf('gestion='+CLAVE_ADMIN)>=0) ESLUCAS=true; })();
 function ahoraArg(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));}
 function parseArg(s){ // soporta "yyyy-MM-dd HH:mm" y "dd/MM/yyyy HH:mm:ss"
   if(!s)return null;
@@ -467,7 +476,11 @@ function renderDia(i){
     ${opts}
     <div class="skip" onclick="skipDia('${dia.k}')">${sel.skip?'✓ ':''}No pido el ${diaCorto}</div>
     <div class="seclabel">Postre</div>
-    <div class="chips">${postres}</div>`;
+    <div class="chips">${postres}</div>
+    <div class="seclabel">Observaciones</div>
+    <input id="obs" class="obs-input" type="text" maxlength="120" placeholder="Ej: en vez de puré, ensalada" value="${(sel.obs||'').replace(/"/g,'&quot;')}">`;
+  const obsEl=document.getElementById('obs');
+  if(obsEl)obsEl.oninput=e=>{const d=pedido.dias[dia.k]||{};d.obs=e.target.value;pedido.dias[dia.k]=d;};
   const last=i===DIAS.length-1;
   navbar.innerHTML=`<div class="inner">
     <button class="btn ghost" onclick="atras(${i})">←</button>
@@ -490,8 +503,9 @@ function renderResumen(){
     let v;
     if(!s||(!s.m&&!s.skip))v=`<span style="color:var(--muted)">— sin elegir —</span>`;
     else if(s.skip)v=`<span style="color:var(--muted)">No pide este día</span>`;
-    else if(!s.p)v=`${d.platos[s.m]}<small style="color:var(--wine);font-weight:700">⚠️ falta el postre</small>`;
-    else v=`${d.platos[s.m]}<small>${postreTxt(s.p)}</small>`;
+    else if(!s.p)v=`${menuTxt(s.m)}<small>${d.platos[s.m]}</small><small style="color:var(--wine);font-weight:700">⚠️ falta el postre</small>`;
+    else v=`${menuTxt(s.m)}<small>${d.platos[s.m]} · ${postreFull(s.p)}</small>`;
+    if(s&&s.obs&&!(!s.m&&!s.skip))v+=`<small style="color:var(--orange);font-weight:700">📝 ${s.obs}</small>`;
     return `<div class="sumrow"><div class="d">${d.nombre}</div><div class="v">${v}</div></div>`;}).join('');
   main.innerHTML=`
     <h2 class="title">Revisá tu pedido</h2>
@@ -511,8 +525,9 @@ function confirmar(){
   PEDIDOS=PEDIDOS.filter(p=>p.nombre!==pedido.nombre);
   const dias={};Object.keys(pedido.dias).forEach(k=>{
     const s=pedido.dias[k];
-    if(s&&s.skip) dias[k]={skip:true};           // eligió "No pido este día"
-    else if(s&&s.m) dias[k]={m:s.m,p:s.p};       // eligió un menú
+    const obs=(s&&s.obs?String(s.obs).trim():'');
+    if(s&&s.skip) dias[k]={skip:true,obs};           // eligió "No pido este día"
+    else if(s&&s.m) dias[k]={m:s.m,p:s.p,obs};       // eligió un menú
   });
   const nuevo={nombre:pedido.nombre,sector:pedido.sector,dias};
   PEDIDOS.push(nuevo);
@@ -593,9 +608,11 @@ function renderAdmin(){
       const list=pe.filter(p=>p.sector===sec);if(!list.length)return'';
       return `<div class="h">Entrega · ${sec} (${list.length})</div>`+list.map(p=>{
         const s=p.dias[d.k];
-        if(s&&s.skip)return `<div class="p"><input type="checkbox" disabled><span class="who" style="color:var(--muted)">${p.nombre}</span><span class="what" style="font-style:italic">no pide</span></div>`;
-        return `<div class="p"><input type="checkbox"><span class="who">${p.nombre}</span>
-        <span class="what">#${s.m} · ${s.p==='NO'?'sin postre':s.p?s.p:'—'}</span></div>`;}).join('');}).join('');
+        const mod=(p.veces&&p.veces>1)?`<span class="modtag" title="Modificado ${p.actualizado||''}">✎</span>`:'';
+        const obs=s&&s.obs?`<div class="obsline">📝 ${s.obs}</div>`:'';
+        if(s&&s.skip)return `<div class="p"><input type="checkbox" disabled><span class="who" style="color:var(--muted)">${p.nombre}${mod}</span><span class="what" style="font-style:italic">no pide</span></div>${obs}`;
+        return `<div class="p"><input type="checkbox"><span class="who">${p.nombre}${mod}</span>
+        <span class="what">${menuTxt(s.m)} · ${s.p==='NO'?'sin postre':s.p?postreFull(s.p):'—'}</span></div>${obs}`;}).join('');}).join('');
     return `<details class="adminday">
       <summary>${d.nombre}<span class="pill">${viandas} viandas</span></summary>
       <div class="adminbody">
@@ -611,6 +628,10 @@ function renderAdmin(){
   const ausRows=AUSENTES.length
     ? AUSENTES.map(c=>`<div class="prow"><span class="who" style="color:var(--muted)">${c}</span><span class="act" onclick="activarColab('${c.replace(/'/g,"\\'")}')">↩️ activar</span></div>`).join('')
     : '';
+  const modificados=PEDIDOS.filter(p=>p.veces&&p.veces>1);
+  const modRows=modificados.length
+    ? modificados.map(p=>`<div class="prow"><span class="who">${p.nombre}</span><span style="font-size:12px;color:var(--muted)">${p.actualizado||''}</span></div>`).join('')
+    : `<div class="prow"><span style="color:var(--muted)">Sin modificaciones esta semana</span></div>`;
   main.innerHTML=`
     <div class="privbar">🔒 Vista privada de Wara · los colaboradores no ven esta sección</div>
     <h2 class="title">Panel Wara</h2>
@@ -629,10 +650,29 @@ function renderAdmin(){
       ${AUSENTES.length?`<div style="font-weight:700;color:var(--muted);margin:14px 0 6px">De licencia / no comen esta semana (${AUSENTES.length})</div>${ausRows}`:''}
     </div>
 
+    <div class="seclabel">Pedidos modificados (${modificados.length})</div>
+    <div class="sumcard" style="padding:10px 14px">${modRows}</div>
+
     <button class="btn prim" style="display:block;width:100%;margin-bottom:18px" onclick="imprimirPlanilla()">🖨️ Imprimir planilla de entrega</button>
     ${days}
+    ${ESLUCAS?`<div class="seclabel" style="color:var(--wine)">Cambio de semana (gestión)</div>
+    <div class="sumcard" style="padding:12px 14px">
+      <div style="font-size:13px;color:var(--ink);margin-bottom:10px">Al empezar una semana nueva, esto <b>guarda una copia</b> de los pedidos actuales y deja la toma en cero (nadie figura como que ya pidió). Hacelo recién cuando ya cargaste el menú nuevo.</div>
+      <button class="btn" style="width:100%;background:var(--wine);color:#fff" onclick="empezarSemanaNueva()">🔄 Empezar semana nueva</button>
+    </div>`:''}
     <p class="footnote">Wara Almacén Saludable · ${SEMANA}</p>
     <div class="footnote"><span style="text-decoration:underline;cursor:pointer" onclick="bloquearPanel()">🔒 Bloquear panel</span></div>`;
+}
+function empezarSemanaNueva(){
+  if(!confirm('¿Empezar una semana nueva?\n\nSe guarda una copia de los pedidos actuales y se limpia la toma para arrancar de cero. Esta acción no se puede deshacer desde acá.'))return;
+  if(!API_URL){alert('Sin conexión a la planilla.');return;}
+  const btnTxt='Limpiando…';
+  fetch(API_URL,{method:"POST",body:JSON.stringify({accion:"reiniciar"})})
+    .then(r=>r.json()).then(()=>refrescarPedidos()).then(()=>{
+      PEDIDOS=[];AUSENTES=[];recordatorioListo='';
+      alert('✓ Listo. Semana nueva iniciada. Se guardó una copia de los pedidos anteriores en la planilla.');
+      render();
+    }).catch(e=>{alert('No se pudo completar. Probá de nuevo en unos segundos.');});
 }
 function marcarAusente(n){if(!AUSENTES.includes(n))AUSENTES.push(n);guardarAusente(n,true);recordatorioListo='';render();}
 function activarColab(n){AUSENTES=AUSENTES.filter(x=>x!==n);guardarAusente(n,false);recordatorioListo='';render();}
@@ -659,7 +699,7 @@ function imprimirPlanilla(){
           <td class="cchk">—</td><td></td></tr>`;
         return `<tr><td class="c0">${i+1}</td><td>${p.nombre}</td>
           <td><b>${s.m} · ${CATS[s.m]?CATS[s.m].n:''}</b><span class="dishsm">${d.platos[s.m]||''}</span></td>
-          <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td></td></tr>`;}).join('');
+          <td>${postreTxt(s.p)}</td><td class="cchk"><span class="box"></span></td><td>${s.obs||''}</td></tr>`;}).join('');
       blocks.push(`<div class="phead">
           <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
           <div class="ptitle">Planilla de entrega — ${d.nombre}</div>
