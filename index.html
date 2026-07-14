@@ -114,6 +114,10 @@
   .fixedsec{background:var(--green-soft);border:2px solid var(--green-line);border-radius:15px;padding:14px 16px;font-weight:800;color:var(--green-deep);font-size:17px}
   .aviso{background:var(--orange-soft);color:#8a5a1c;border:1px solid #EAD2A8;border-radius:14px;padding:13px 15px;font-size:15px;font-weight:700;margin-bottom:14px;display:flex;gap:8px;align-items:center;animation:pop .25s ease}
   @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+  /* Botón "Enviar" con pulso para que no se ignore el último paso */
+  .btn.prim.pulse{animation:btnpulse 1.7s ease-in-out infinite}
+  @keyframes btnpulse{0%,100%{box-shadow:var(--shadow)}50%{box-shadow:0 0 0 5px rgba(94,143,60,.30),var(--shadow)}}
+  @media (prefers-reduced-motion:reduce){.btn.prim.pulse{animation:none}}
   /* Glass: menos blur en mobile (gama media/baja) y fallback sólido si no hay soporte */
   @media (max-width:480px){ :root{--glass-blur:7px} }
   @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
@@ -313,6 +317,7 @@ let PEDIDOS = [];
 let tab="order";
 let view="welcome";       // welcome | dia0..4 | resumen | listo
 let pedido={nombre:"",sector:"",dias:{}};
+let dirty=false;          // hay cambios en el pedido sin enviar (para avisar si intenta salir)
 let avisoDia='';
 let miPedidoNombre='';
 function postreTxt(p){return !p?'—':p==='NO'?'Sin postre':POSTRES[p];}
@@ -443,6 +448,7 @@ function renderWelcome(){
 }
 function pedidoDe(nombre){return PEDIDOS.find(p=>p.nombre===nombre);}
 function pickNombre(v){
+  dirty=false;            // al elegir nombre se (re)carga el pedido guardado: todavía no hay cambios propios
   pedido.nombre=v;
   const ex=pedidoDe(v);
   if(ex){pedido.sector=ex.sector;pedido.dias=JSON.parse(JSON.stringify(ex.dias));}
@@ -517,15 +523,15 @@ function renderDia(i){
     <div class="seclabel">Observaciones</div>
     <input id="obs" class="obs-input" type="text" maxlength="120" placeholder="Ej: en vez de puré, ensalada" value="${(sel.obs||'').replace(/"/g,'&quot;')}">`;
   const obsEl=document.getElementById('obs');
-  if(obsEl)obsEl.oninput=e=>{const d=pedido.dias[dia.k]||{};d.obs=e.target.value;pedido.dias[dia.k]=d;};
+  if(obsEl)obsEl.oninput=e=>{const d=pedido.dias[dia.k]||{};d.obs=e.target.value;pedido.dias[dia.k]=d;dirty=true;};
   const last=i===DIAS.length-1;
   navbar.innerHTML=`<div class="inner">
     <button class="btn ghost" onclick="atras(${i})">←</button>
     <button class="btn prim" onclick="siguienteDia(${i})">${last?'Ver resumen':'Siguiente día'} &nbsp;→</button></div>`;
 }
-function pickMenu(k,m){const d=pedido.dias[k]||{};d.m=m;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
-function pickPostre(k,p){const d=pedido.dias[k]||{};d.p=p;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
-function skipDia(k){pedido.dias[k]={skip:true};avisoDia='';render();}
+function pickMenu(k,m){const d=pedido.dias[k]||{};d.m=m;delete d.skip;pedido.dias[k]=d;dirty=true;avisoDia='';render();}
+function pickPostre(k,p){const d=pedido.dias[k]||{};d.p=p;delete d.skip;pedido.dias[k]=d;dirty=true;avisoDia='';render();}
+function skipDia(k){pedido.dias[k]={skip:true};dirty=true;avisoDia='';render();}
 function atras(i){avisoDia='';if(i===0)view='welcome';else view='dia'+(i-1);render();}
 function siguienteDia(i){
   const dia=DIAS[i];const s=pedido.dias[dia.k]||{};
@@ -547,11 +553,12 @@ function renderResumen(){
   main.innerHTML=`
     <h2 class="title">Revisá tu pedido</h2>
     <p class="sub">${pedido.nombre} · ${pedido.sector}</p>
+    <div class="aviso">⚠️ <div><b>Tu pedido todavía NO fue enviado.</b> Para que quede guardado, tocá abajo el botón verde <b>“Enviar mi pedido ✓”</b>. Si salís ahora, se pierde.</div></div>
     <div class="sumcard">${rows}</div>
     <p class="footnote">Si algo está mal, tocá ← para volver y corregirlo.<br>Los días en blanco se toman como "no pide".</p>`;
   navbar.innerHTML=`<div class="inner">
     <button class="btn ghost" onclick="atras(DIAS.length)">←</button>
-    <button class="btn prim" onclick="confirmar()">Enviar mi pedido ✓</button></div>`;
+    <button class="btn prim pulse" onclick="confirmar()">Enviar mi pedido ✓</button></div>`;
 }
 function confirmar(){
   if(!estaAbierto())return renderCerrado();
@@ -569,6 +576,7 @@ function confirmar(){
   const nuevo={nombre:pedido.nombre,sector:pedido.sector,dias};
   PEDIDOS.push(nuevo);
   guardarPedido(nuevo);
+  dirty=false;            // enviado con éxito: ya no hay nada pendiente que perder
   view='listo';render();
 }
 function renderListo(){
@@ -584,7 +592,7 @@ function renderListo(){
     <button class="btn prim" style="width:100%" onclick="descargarComprobante('${pedido.nombre.replace(/'/g,"\\'")}')">📥 Descargar mi pedido</button>
     <button class="btn" style="width:100%;background:transparent;color:var(--green-deep)" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button></div>`;
 }
-function otroPedido(){pedido={nombre:"",sector:"",dias:{}};avisoDia='';view='welcome';render();}
+function otroPedido(){pedido={nombre:"",sector:"",dias:{}};dirty=false;avisoDia='';view='welcome';render();}
 function renderMiPedido(){
   const p=miPedidoNombre?pedidoDe(miPedidoNombre):null;
   let cuerpo='';
@@ -783,6 +791,18 @@ function descargarComprobante(nombre){
   document.getElementById('printArea').innerHTML=`<section class="pblock">${html}</section>`;
   window.print();
 }
+/* ============ AVISO AL SALIR CON PEDIDO SIN ENVIAR ============ */
+// ¿Hay al menos un día con un menú elegido (no "no pido")?
+function hayMenuElegido(){return Object.keys(pedido.dias||{}).some(function(k){var s=pedido.dias[k];return s&&s.m&&!s.skip;});}
+// Hay pedido pendiente si: editó algo (dirty), está en la toma de pedido (no en el Panel),
+// no llegó a "enviado" (view!=='listo') y realmente eligió al menos un menú.
+function pedidoPendiente(){return dirty && tab==='order' && view!=='listo' && hayMenuElegido();}
+// Los navegadores modernos ignoran el texto propio y muestran su cartel genérico;
+// igual mostramos la advertencia. El mensaje claro en español va dentro de la app (resumen).
+window.addEventListener('beforeunload',function(e){
+  if(pedidoPendiente()){ e.preventDefault(); e.returnValue=''; return ''; }
+});
+
 arrancar();
 </script>
 </body>
