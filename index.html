@@ -404,6 +404,7 @@ function estaAbierto(){return MODO==='abierto'?true:MODO==='cerrado'?false:venta
 
 /* ============ RENDER ============ */
 function render(){window.scrollTo(0,0);
+  actualizarGuardiaSalida();
   if(tab==='admin'){if(!waraUnlocked)return renderGateWara();renderAdmin();return;}
   if(view==='mipedido')return renderMiPedido();
   if(!estaAbierto()&&view!=='listo')return renderCerrado();
@@ -797,10 +798,34 @@ function hayMenuElegido(){return Object.keys(pedido.dias||{}).some(function(k){v
 // Hay pedido pendiente si: editó algo (dirty), está en la toma de pedido (no en el Panel),
 // no llegó a "enviado" (view!=='listo') y realmente eligió al menos un menú.
 function pedidoPendiente(){return dirty && tab==='order' && view!=='listo' && hayMenuElegido();}
-// Los navegadores modernos ignoran el texto propio y muestran su cartel genérico;
-// igual mostramos la advertencia. El mensaje claro en español va dentro de la app (resumen).
+// beforeunload cubre cerrar pestaña / recargar / navegar afuera. En móviles el botón "atrás"
+// NO dispara beforeunload (lo cubre la guardia de historial de más abajo).
+// confirmandoSalida evita que, cuando el usuario ya confirmó salir con nuestro aviso, salte
+// además el cartel nativo (doble aviso).
 window.addEventListener('beforeunload',function(e){
-  if(pedidoPendiente()){ e.preventDefault(); e.returnValue=''; return ''; }
+  if(!confirmandoSalida && pedidoPendiente()){ e.preventDefault(); e.returnValue=''; return ''; }
+});
+
+// Guardia del botón "atrás" (celular/navegador): interceptamos el historial. Mientras haya
+// pedido pendiente dejamos UNA entrada extra empujada; al tocar "atrás" se consume esa entrada
+// y, en vez de salir, mostramos una confirmación clara dentro de la app. La navegación interna
+// de la app (botones ← entre días/pantallas) no usa el historial, así que no se ve afectada.
+let guardiaHistorial=false;    // ya hay una entrada extra empujada en el historial
+let confirmandoSalida=false;   // el usuario ya confirmó salir: no volver a preguntar en beforeunload
+function actualizarGuardiaSalida(){
+  if(pedidoPendiente()&&!guardiaHistorial){ guardiaHistorial=true; confirmandoSalida=false; history.pushState({waraGuardia:true},''); }
+}
+window.addEventListener('popstate',function(){
+  if(pedidoPendiente()){
+    // Tocó "atrás" con el pedido a medias: preguntamos antes de dejar salir.
+    if(confirm('Tu pedido todavía NO fue enviado. Si salís ahora, se pierde.\n\n¿Querés salir igual?')){
+      confirmandoSalida=true; guardiaHistorial=false; history.back(); // salir de verdad
+    } else {
+      history.pushState({waraGuardia:true},''); // se queda: reponemos la entrada, sigue como si nada
+    }
+  } else {
+    guardiaHistorial=false; // ya no hay nada pendiente (enviado / vacío / Panel): "atrás" normal, sin molestar
+  }
 });
 
 arrancar();
