@@ -317,7 +317,6 @@ let PEDIDOS = [];
 let tab="order";
 let view="welcome";       // welcome | dia0..4 | resumen | listo
 let pedido={nombre:"",sector:"",dias:{}};
-let dirty=false;          // hay cambios en el pedido sin enviar (para avisar si intenta salir)
 let avisoDia='';
 let miPedidoNombre='';
 function postreTxt(p){return !p?'—':p==='NO'?'Sin postre':POSTRES[p];}
@@ -449,7 +448,6 @@ function renderWelcome(){
 }
 function pedidoDe(nombre){return PEDIDOS.find(p=>p.nombre===nombre);}
 function pickNombre(v){
-  dirty=false;            // al elegir nombre se (re)carga el pedido guardado: todavía no hay cambios propios
   pedido.nombre=v;
   const ex=pedidoDe(v);
   if(ex){pedido.sector=ex.sector;pedido.dias=JSON.parse(JSON.stringify(ex.dias));}
@@ -524,15 +522,15 @@ function renderDia(i){
     <div class="seclabel">Observaciones</div>
     <input id="obs" class="obs-input" type="text" maxlength="120" placeholder="Ej: en vez de puré, ensalada" value="${(sel.obs||'').replace(/"/g,'&quot;')}">`;
   const obsEl=document.getElementById('obs');
-  if(obsEl)obsEl.oninput=e=>{const d=pedido.dias[dia.k]||{};d.obs=e.target.value;pedido.dias[dia.k]=d;dirty=true;};
+  if(obsEl)obsEl.oninput=e=>{const d=pedido.dias[dia.k]||{};d.obs=e.target.value;pedido.dias[dia.k]=d;};
   const last=i===DIAS.length-1;
   navbar.innerHTML=`<div class="inner">
     <button class="btn ghost" onclick="atras(${i})">←</button>
     <button class="btn prim" onclick="siguienteDia(${i})">${last?'Ver resumen':'Siguiente día'} &nbsp;→</button></div>`;
 }
-function pickMenu(k,m){const d=pedido.dias[k]||{};d.m=m;delete d.skip;pedido.dias[k]=d;dirty=true;avisoDia='';render();}
-function pickPostre(k,p){const d=pedido.dias[k]||{};d.p=p;delete d.skip;pedido.dias[k]=d;dirty=true;avisoDia='';render();}
-function skipDia(k){pedido.dias[k]={skip:true};dirty=true;avisoDia='';render();}
+function pickMenu(k,m){const d=pedido.dias[k]||{};d.m=m;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
+function pickPostre(k,p){const d=pedido.dias[k]||{};d.p=p;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
+function skipDia(k){pedido.dias[k]={skip:true};avisoDia='';render();}
 function atras(i){avisoDia='';if(i===0)view='welcome';else view='dia'+(i-1);render();}
 function siguienteDia(i){
   const dia=DIAS[i];const s=pedido.dias[dia.k]||{};
@@ -577,7 +575,6 @@ function confirmar(){
   const nuevo={nombre:pedido.nombre,sector:pedido.sector,dias};
   PEDIDOS.push(nuevo);
   guardarPedido(nuevo);
-  dirty=false;            // enviado con éxito: ya no hay nada pendiente que perder
   view='listo';render();
 }
 function renderListo(){
@@ -593,7 +590,7 @@ function renderListo(){
     <button class="btn prim" style="width:100%" onclick="descargarComprobante('${pedido.nombre.replace(/'/g,"\\'")}')">📥 Descargar mi pedido</button>
     <button class="btn" style="width:100%;background:transparent;color:var(--green-deep)" onclick="otroPedido()">➕ Cargar pedido de otro compañero</button></div>`;
 }
-function otroPedido(){pedido={nombre:"",sector:"",dias:{}};dirty=false;avisoDia='';view='welcome';render();}
+function otroPedido(){pedido={nombre:"",sector:"",dias:{}};avisoDia='';view='welcome';render();}
 function renderMiPedido(){
   const p=miPedidoNombre?pedidoDe(miPedidoNombre):null;
   let cuerpo='';
@@ -795,9 +792,12 @@ function descargarComprobante(nombre){
 /* ============ AVISO AL SALIR CON PEDIDO SIN ENVIAR ============ */
 // ¿Hay al menos un día con un menú elegido (no "no pido")?
 function hayMenuElegido(){return Object.keys(pedido.dias||{}).some(function(k){var s=pedido.dias[k];return s&&s.m&&!s.skip;});}
-// Hay pedido pendiente si: editó algo (dirty), está en la toma de pedido (no en el Panel),
-// no llegó a "enviado" (view!=='listo') y realmente eligió al menos un menú.
-function pedidoPendiente(){return dirty && tab==='order' && view!=='listo' && hayMenuElegido();}
+// ¿Está en una pantalla de edición del pedido? (algún día o el resumen, no bienvenida/enviado/ver)
+function estaEditando(){return view.indexOf('dia')===0 || view==='resumen';}
+// Hay pedido pendiente si está en la toma de pedido (no en el Panel), en pantalla de edición,
+// y hay al menos un menú elegido sin enviar. Cubre pedidos NUEVOS y MODIFICACIONES de uno ya
+// hecho (mientras no toque "Enviar"), que es cuando conviene avisar al salir.
+function pedidoPendiente(){return tab==='order' && estaEditando() && hayMenuElegido();}
 // beforeunload cubre cerrar pestaña / recargar / navegar afuera. En móviles el botón "atrás"
 // NO dispara beforeunload (lo cubre la guardia de historial de más abajo).
 // confirmandoSalida evita que, cuando el usuario ya confirmó salir con nuestro aviso, salte
