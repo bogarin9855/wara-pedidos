@@ -387,22 +387,12 @@ const CLAVE_PRUEBA="pruebawara";
   if(q.indexOf('modo=abierto-'+CLAVE_PRUEBA)>=0) MODO='abierto';
   else if(q.indexOf('modo=cerrado-'+CLAVE_PRUEBA)>=0) MODO='cerrado';
 })();
-// Herramientas de gestión solo para Lucas (no para Wara). Se activan agregando ?gestion=CLAVE al link.
-// Una vez que entrás con ?gestion=CLAVE, queda recordado en ESE dispositivo (localStorage),
-// igual que la sesión del panel, así no hace falta usar siempre el link largo.
-// Se borra con "Cerrar sesión". En el celular de Wara nunca se activa.
+// Herramientas de gestión solo para Lucas (no para Wara). El botón "Empezar semana nueva" queda
+// OCULTO siempre, salvo que la URL traiga ?gestion=CLAVE. No se recuerda ni se guarda en el
+// dispositivo: entrás con el link especial solo cuando lo necesitás, y con el link normal nunca aparece.
 const CLAVE_ADMIN="bogarin";
-const GESTION_WARA="wara_modo_gestion";
 let ESLUCAS=false;
-(function(){
-  if(!CLAVE_ADMIN)return;
-  if((location.search||'').toLowerCase().indexOf('gestion='+CLAVE_ADMIN)>=0){
-    ESLUCAS=true;                                          // entró con el link de gestión
-    try{localStorage.setItem(GESTION_WARA,'1');}catch(e){}  // y lo recordamos para las próximas
-    return;
-  }
-  try{ if(localStorage.getItem(GESTION_WARA)==='1') ESLUCAS=true; }catch(e){} // recordado de antes
-})();
+(function(){ if(CLAVE_ADMIN && (location.search||'').toLowerCase().indexOf('gestion='+CLAVE_ADMIN)>=0) ESLUCAS=true; })();
 function ahoraArg(){return new Date(new Date().toLocaleString('en-US',{timeZone:'America/Argentina/Buenos_Aires'}));}
 function parseArg(s){ // soporta "yyyy-MM-dd HH:mm" y "dd/MM/yyyy HH:mm:ss"
   if(!s)return null;
@@ -520,9 +510,9 @@ function tryWara(){const v=(document.getElementById('clw').value||'').trim();
   else{claveErr='Clave incorrecta.';render();}
 }
 function bloquearPanel(){waraUnlocked=false;detenerAutoRefresco();render();}
-function cerrarSesionWara(){ // olvida la sesión recordada (y el modo gestión) y vuelve a pedir la clave
-  waraUnlocked=false;detenerAutoRefresco();ESLUCAS=false;
-  try{localStorage.removeItem(SESION_WARA);localStorage.removeItem(GESTION_WARA);}catch(e){}
+function cerrarSesionWara(){ // olvida la sesión recordada y vuelve a pedir la clave
+  waraUnlocked=false;detenerAutoRefresco();
+  try{localStorage.removeItem(SESION_WARA);}catch(e){}
   claveErr='';render();
 }
 
