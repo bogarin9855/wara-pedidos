@@ -759,8 +759,10 @@ function activarColab(n){AUSENTES=AUSENTES.filter(x=>x!==n);guardarAusente(n,fal
 function copiarRecordatorio(){
   const pidieron=PEDIDOS.map(p=>p.nombre);
   const pend=COLABS.map(c=>c.n).filter(n=>!pidieron.includes(n)&&!AUSENTES.includes(n));
-  const nombres=pend.map(c=>c.split(' ')[0]).join(', ');
-  const txt=`¡Hola! 🍽️ Recordá elegir tu menú de la semana antes de que cierre (${CIERRE}).\nEntrá acá 👇\n${URL_PUBLICA}\nTodavía faltan: ${nombres}.\n¡Gracias! 🙌`;
+  // Cada colaborador que falta, con nombre y apellido tal como figura en la planilla, en su propia línea.
+  const nombres=pend.join('\n');
+  // CIERRE = horario de cierre que ya usa el sistema (no hardcodeado). URL_PUBLICA = link de la app.
+  const txt=`¡Hola! 🍽️\nRecordá elegir tu menú de la semana antes del cierre (${CIERRE}).\nFALTAN\n${nombres}\nEntrá acá 👇\n${URL_PUBLICA}\n¡Gracias! 🙌`;
   recordatorioListo=txt.replace(/\n/g,'<br>');
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).catch(()=>{});}
   render();
