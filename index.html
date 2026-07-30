@@ -302,20 +302,26 @@ let COLABS = [
   {n:"Stella Tuma", s:"PLANTA"},
   {n:"Virgilio Coria", s:"PLANTA"},
   {n:"Ejemplo Tavella 1", s:"TAVELLA"},
-  {n:"Ejemplo Rotativo 3", s:"PLANTA / JURAMENTO / TAVELLA"}
+  {n:"Ejemplo Rotativo Diario", s:"PLANTA / JURAMENTO / TAVELLA (diario)"}
 ];
 COLABS.sort((a,b)=>a.n.localeCompare(b.n,'es'));
 // Fallback local (en producción se sobrescribe con los sectores de la planilla). Sucursales fijas de entrega.
 let SECTORES = ["JURAMENTO","PLANTA","TAVELLA"];
 function sectorDe(nombre){const c=COLABS.find(x=>x.n===nombre);return c?c.s:'';}
 /* ---- Sucursales: el SECTOR de la planilla define entre cuáles rota cada persona ----
-   "PLANTA"                        -> fija en PLANTA
-   "PLANTA / JURAMENTO"            -> rota entre esas dos
-   "PLANTA / JURAMENTO / TAVELLA"  -> rota entre las tres (soporta cualquier cantidad)
-   Tolera espacios de más alrededor de las barras.                                   */
-function sucursalesDe(txt){return String(txt||'').split('/').map(s=>s.trim()).filter(Boolean);}
+   "PLANTA"                        -> fija en PLANTA (no elige)
+   "PLANTA / JURAMENTO"            -> rotativo SEMANAL: elige 1 al inicio (soporta cualquier cantidad)
+   "PLANTA / JURAMENTO (diario)"   -> rotativo POR DÍA: elige la sucursal en cada día
+   Tolera espacios de más y el marcador (diario) con/sin espacio y en cualquier may/min.   */
+function esDiario(sec){return /\(\s*diario\s*\)/i.test(String(sec||''));}
+function sucursalesDe(txt){return String(txt||'').replace(/\(\s*diario\s*\)/ig,'').split('/').map(s=>s.trim()).filter(Boolean);}
 function esRotativo(nombre){return sucursalesDe(sectorDe(nombre)).length>1;}
+function esRotativoDiario(nombre){return esRotativo(nombre)&&esDiario(sectorDe(nombre));}
 function opcionesSucursal(nombre){return sucursalesDe(sectorDe(nombre));}
+// Sucursal de ENTREGA de un pedido para un día puntual: la elegida ese día (diario) o la fija/semanal.
+function sucursalPedidoDia(p,dk){const s=(p&&p.dias)?p.dias[dk]:null;return (s&&s.suc)?s.suc:((p&&p.sector)?p.sector:'');}
+// Etiqueta de sucursal para mostrar en resúmenes de un pedido ya armado.
+function sectorDePedido(p){if(p&&p.dias&&Object.keys(p.dias).some(k=>p.dias[k]&&p.dias[k].suc))return 'sucursal por día';return (p&&p.sector)?p.sector:'';}
 // Sucursales REALES de entrega (para el Panel y la planilla impresa): expande los sectores
 // combinados y descarta duplicados. Respeta el orden de aparición de la planilla.
 // Incluye las sucursales ya elegidas por quienes pidieron, para que nadie desaparezca.
@@ -323,7 +329,7 @@ function sucursalesEntrega(){
   const out=[], add=s=>sucursalesDe(s).forEach(x=>{if(out.indexOf(x)<0)out.push(x);});
   (SECTORES||[]).forEach(add);
   (COLABS||[]).forEach(c=>add(c.s));
-  (PEDIDOS||[]).forEach(p=>add(p.sector));
+  (PEDIDOS||[]).forEach(p=>{add(p.sector);if(p.dias)Object.keys(p.dias).forEach(k=>{if(p.dias[k]&&p.dias[k].suc)add(p.dias[k].suc);});});
   return out;
 }
 
@@ -345,7 +351,7 @@ function resumenCorto(p){
   return DIAS.filter(d=>p.dias[d.k]).map(d=>{
     const s=p.dias[d.k];
     if(s.skip)return `${d.nombre.split(' ')[0]}: no pide`;
-    return `${d.nombre.split(' ')[0]}: ${menuTxt(s.m)}${s.p?' + '+postreFull(s.p):''}${s.obs?' ('+s.obs+')':''}`;
+    return `${d.nombre.split(' ')[0]}: ${menuTxt(s.m)}${s.p?' + '+postreFull(s.p):''}${s.suc?' 📍'+s.suc:''}${s.obs?' ('+s.obs+')':''}`;
   }).join(' · ')||'sin días cargados';
 }
 // Tarjeta de resumen completo (para ver/descargar)
@@ -355,6 +361,7 @@ function resumenCard(p){
     let v;
     if(s.skip)v=`<span style="color:var(--muted)">No pide este día</span>`;
     else v=`${menuTxt(s.m)}<small>${platoDe(d.k,s.m)} · ${postreFull(s.p)}</small>`;
+    if(s.suc&&!s.skip)v+=`<small style="color:var(--green);font-weight:700">📍 ${s.suc}</small>`;
     if(s.obs)v+=`<small style="color:var(--orange);font-weight:700">📝 ${s.obs}</small>`;
     return `<div class="sumrow"><div class="d">${d.nombre}</div><div class="v">${v}</div></div>`;
   }).join('')||`<div class="sumrow"><div class="v" style="color:var(--muted)">Sin días cargados</div></div>`;
@@ -439,10 +446,14 @@ function renderWelcome(){
     const dets=resumenCorto(ex);
     yaPidio=`<div class="aviso" style="margin-top:16px"><div>⚠️ <b>${pedido.nombre.split(' ')[0]}</b> ya cargó su pedido esta semana.<br><span style="font-weight:600;font-size:13.5px">Si seguís, lo vas a <b>modificar</b> (queda cargado lo nuevo). Pedido actual → ${dets}.</span></div></div>`;
   }
+  const rotDia=pedido.nombre?esRotativoDiario(pedido.nombre):false;
   const rot=pedido.nombre?esRotativo(pedido.nombre):false;
   let sucursalUI='';
   if(pedido.nombre){
-    if(rot){
+    if(rotDia){
+      sucursalUI=`<label class="fld">Tu sucursal</label>
+        <div class="fixedsec" style="font-size:15px;line-height:1.35">📍 Elegís tu sucursal <b>en cada día</b>, junto con el menú.</div>`;
+    }else if(rot){
       sucursalUI=`<label class="fld">¿En qué sucursal retirás esta semana?</label>
         <div class="chips">${opcionesSucursal(pedido.nombre).map(s=>`<div class="chip ${pedido.sector===s?'on':''}" onclick="pickSec('${s.replace(/'/g,"\\'")}')">${s}</div>`).join('')}</div>`;
     }else{
@@ -474,7 +485,10 @@ function pickNombre(v){
   render();
 }
 function pickSec(s){pedido.sector=s;render();}
-function updNav(){const b=document.getElementById('go');if(b)b.disabled=!(pedido.nombre&&pedido.sector);}
+function updNav(){const b=document.getElementById('go');if(!b)return;
+  // Para "empezar" alcanza con el nombre si es rotativo diario (elige la sucursal día por día);
+  // fijos y rotativos semanales necesitan sucursal definida antes de arrancar.
+  b.disabled=!(pedido.nombre && (esRotativoDiario(pedido.nombre) || pedido.sector));}
 
 function renderGateWara(){
   navbar.innerHTML='';
@@ -529,6 +543,10 @@ function renderDia(i){
     const on=sel.p===p;
     return `<div class="chip ${on?'on':''}" onclick="pickPostre('${dia.k}','${p}')">${postOpts[p]}</div>`;}).join('');
   const diaCorto=dia.nombre.split(' ')[0].toLowerCase();
+  // Rotativo "diario": elige la sucursal en este día (se oculta si marcó "No pido").
+  const rotDia=esRotativoDiario(pedido.nombre);
+  const sucSection=(rotDia&&!sel.skip)?`<div class="seclabel">📍 ¿Dónde retirás este día?</div>
+    <div class="chips">${opcionesSucursal(pedido.nombre).map(s=>`<div class="chip ${sel.suc===s?'on':''}" onclick="pickSuc('${dia.k}','${s.replace(/'/g,"\\'")}')">${s}</div>`).join('')}</div>`:'';
   main.innerHTML=`
     <div class="steps">${DIAS.map((_,j)=>`<div class="${j<i?'done':j===i?'now':''}"></div>`).join('')}</div>
     <div class="daybadge">🍃 ${dia.nombre}</div>
@@ -536,6 +554,7 @@ function renderDia(i){
     <h2 class="title" style="font-size:23px">Elegí tu plato</h2>
     ${opts}
     <div class="skip" onclick="skipDia('${dia.k}')">${sel.skip?'✓ ':''}No pido el ${diaCorto}</div>
+    ${sucSection}
     <div class="seclabel">Postre</div>
     <div class="chips">${postres}</div>
     <div class="seclabel">Observaciones</div>
@@ -549,6 +568,7 @@ function renderDia(i){
 }
 function pickMenu(k,m){const d=pedido.dias[k]||{};d.m=m;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
 function pickPostre(k,p){const d=pedido.dias[k]||{};d.p=p;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
+function pickSuc(k,s){const d=pedido.dias[k]||{};d.suc=s;delete d.skip;pedido.dias[k]=d;avisoDia='';render();}
 function skipDia(k){pedido.dias[k]={skip:true};avisoDia='';render();}
 function atras(i){avisoDia='';if(i===0)view='welcome';else view='dia'+(i-1);render();}
 function siguienteDia(i){
@@ -556,6 +576,7 @@ function siguienteDia(i){
   const corto=dia.nombre.split(' ')[0].toLowerCase();
   if(!s.skip&&!s.m){avisoDia='Elegí tu plato tocando una opción 👆 — o tocá "No pido el '+corto+'".';render();return;}
   if(!s.skip&&!s.p){avisoDia='¡Ya casi! Te falta tocar el postre 👇 (podés elegir "Sin postre").';render();return;}
+  if(!s.skip&&esRotativoDiario(pedido.nombre)&&!s.suc){avisoDia='Elegí en qué sucursal retirás este día 📍';render();return;}
   avisoDia='';if(i===DIAS.length-1)view='resumen';else view='dia'+(i+1);render();
 }
 
@@ -566,11 +587,13 @@ function renderResumen(){
     else if(s.skip)v=`<span style="color:var(--muted)">No pide este día</span>`;
     else if(!s.p)v=`${menuTxt(s.m)}<small>${d.platos[s.m]}</small><small style="color:var(--wine);font-weight:700">⚠️ falta el postre</small>`;
     else v=`${menuTxt(s.m)}<small>${d.platos[s.m]} · ${postreFull(s.p)}</small>`;
+    if(s&&s.suc&&!s.skip)v+=`<small style="color:var(--green);font-weight:700">📍 ${s.suc}</small>`;
     if(s&&s.obs&&!(!s.m&&!s.skip))v+=`<small style="color:var(--orange);font-weight:700">📝 ${s.obs}</small>`;
     return `<div class="sumrow"><div class="d">${d.nombre}</div><div class="v">${v}</div></div>`;}).join('');
+  const subSuc=esRotativoDiario(pedido.nombre)?'sucursal por día':pedido.sector;
   main.innerHTML=`
     <h2 class="title">Revisá tu pedido</h2>
-    <p class="sub">${pedido.nombre} · ${pedido.sector}</p>
+    <p class="sub">${pedido.nombre}${subSuc?' · '+subSuc:''}</p>
     <div class="aviso">⚠️ <div><b>Tu pedido todavía NO fue enviado.</b> Para que quede guardado, tocá abajo el botón verde <b>“Enviar mi pedido ✓”</b>. Si salís ahora, se pierde.</div></div>
     <div class="sumcard">${rows}</div>
     <p class="footnote">Si algo está mal, tocá ← para volver y corregirlo.<br>Los días en blanco se toman como "no pide".</p>`;
@@ -580,8 +603,10 @@ function renderResumen(){
 }
 function confirmar(){
   if(!estaAbierto())return renderCerrado();
+  const rotDia=esRotativoDiario(pedido.nombre);
   for(let i=0;i<DIAS.length;i++){const s=pedido.dias[DIAS[i].k];
-    if(s&&s.m&&!s.skip&&!s.p){avisoDia='Te falta tocar el postre de este día 👇 (podés elegir "Sin postre").';view='dia'+i;render();return;}}
+    if(s&&s.m&&!s.skip&&!s.p){avisoDia='Te falta tocar el postre de este día 👇 (podés elegir "Sin postre").';view='dia'+i;render();return;}
+    if(rotDia&&s&&s.m&&!s.skip&&!s.suc){avisoDia='Elegí en qué sucursal retirás este día 📍';view='dia'+i;render();return;}}
   const elegidos=DIAS.filter(d=>{const s=pedido.dias[d.k];return s&&s.m&&!s.skip;}).length;
   if(elegidos===0){avisoDia='Todavía no elegiste ningún menú. Tocá una opción para empezar 👆';view='dia0';render();return;}
   PEDIDOS=PEDIDOS.filter(p=>p.nombre!==pedido.nombre);
@@ -589,7 +614,7 @@ function confirmar(){
     const s=pedido.dias[k];
     const obs=(s&&s.obs?String(s.obs).trim():'');
     if(s&&s.skip) dias[k]={skip:true,obs};           // eligió "No pido este día"
-    else if(s&&s.m) dias[k]={m:s.m,p:s.p,obs};       // eligió un menú
+    else if(s&&s.m){ dias[k]={m:s.m,p:s.p,obs}; if(s.suc) dias[k].suc=s.suc; } // menú (+ sucursal si es diario)
   });
   const nuevo={nombre:pedido.nombre,sector:pedido.sector,dias};
   PEDIDOS.push(nuevo);
@@ -621,7 +646,7 @@ function renderMiPedido(){
       <div class="aviso" style="margin-top:14px"><div>No encontramos un pedido de <b>${miPedidoNombre.split(' ')[0]}</b> esta semana.</div></div>`;
   }else{
     cuerpo=`<select id="nomvp"><option value="">Elegí tu nombre…</option>${COLABS.map(c=>`<option ${miPedidoNombre===c.n?'selected':''}>${c.n}</option>`).join('')}</select>
-      <p class="sub" style="margin-top:10px">${p.nombre} · ${p.sector}</p>
+      <p class="sub" style="margin-top:10px">${p.nombre} · ${sectorDePedido(p)}</p>
       ${resumenCard(p)}`;
   }
   main.innerHTML=`<img src="${LOGO}" class="logo-big" alt="Wara">
@@ -668,7 +693,7 @@ function renderAdmin(){
     const postRows=Object.keys(post).sort().map(k=>
       `<div class="cookrow"><b>${POSTRES[k]||k}</b><span class="q">${post[k]}</span></div>`).join('');
     const delivBy=sucursalesEntrega().map(sec=>{
-      const list=pe.filter(p=>p.sector===sec);if(!list.length)return'';
+      const list=pe.filter(p=>sucursalPedidoDia(p,d.k)===sec);if(!list.length)return'';
       return `<div class="h">Entrega · ${sec} (${list.length})</div>`+list.map(p=>{
         const s=p.dias[d.k];
         const mod=(p.veces&&p.veces>1)?`<span class="modtag" title="Modificado ${p.actualizado||''}">✎</span>`:'';
@@ -762,7 +787,7 @@ function imprimirPlanilla(){
   DIAS.forEach(d=>{
     const pe=PEDIDOS.filter(p=>p.dias[d.k]);
     sucursalesEntrega().forEach(sec=>{
-      const list=pe.filter(p=>p.sector===sec).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+      const list=pe.filter(p=>sucursalPedidoDia(p,d.k)===sec).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
       if(!list.length)return;
       const viandas=list.filter(p=>p.dias[d.k]&&!p.dias[d.k].skip).length;
       const rows=list.map((p,i)=>{const s=p.dias[d.k];
@@ -796,13 +821,13 @@ function descargarComprobante(nombre){
     let menu, postre;
     if(!s){menu='<span style="color:#999">—</span>';postre='—';}
     else if(s.skip){menu='<span style="color:#999;font-style:italic">No pide este día</span>';postre='—';}
-    else{menu=`<b>${menuTxt(s.m)}</b><span class="dishsm">${platoDe(d.k,s.m)}</span>`;postre=postreTxt(s.p);}
+    else{menu=`<b>${menuTxt(s.m)}</b><span class="dishsm">${platoDe(d.k,s.m)}</span>${s.suc?`<span class="dishsm">📍 ${s.suc}</span>`:''}`;postre=postreTxt(s.p);}
     return `<tr><td>${d.nombre}</td><td>${menu}</td><td>${postre}</td></tr>`;
   }).join('');
   const html=`<div class="phead">
       <div class="pbrand"><img src="${LOGO}" alt="Wara"><div><span class="pname">Wara</span><span class="ptag">Comida saludable · Salta</span></div></div>
       <div class="ptitle">Comprobante de pedido</div>
-      <div class="pmeta"><b>${p.nombre}</b> · ${p.sector} · ${SEMANA}</div>
+      <div class="pmeta"><b>${p.nombre}</b> · ${sectorDePedido(p)} · ${SEMANA}</div>
     </div>
     <table class="ptable"><thead><tr><th>Día</th><th>Menú</th><th>Postre</th></tr></thead>
     <tbody>${rows}</tbody></table>
