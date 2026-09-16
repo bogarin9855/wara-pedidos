@@ -151,15 +151,16 @@
        Clases propias (.plan-*) para no tocar el comprobante individual, que sigue usando .ptable/.pblock. */
     .plan-page{page-break-after:always;break-after:page}
     .plan-page:last-child{page-break-after:auto;break-after:auto}
-    .plan-brand{display:flex;align-items:center;gap:7px;border-bottom:1.5px solid #2E5A28;padding-bottom:3px;margin-bottom:7px}
-    .plan-brand img{width:18px;height:18px;border-radius:50%;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .plan-brand .pn{font-family:'Fraunces',serif;font-weight:700;font-size:13px;color:#2E5A28;line-height:1}
-    .plan-brand .ps{margin-left:auto;font-family:'Figtree',sans-serif;font-size:10px;color:#444;font-weight:600}
+    /* Encabezado de hoja en texto (sin logo), con el dia y la semana: es el formato de la planilla
+       que Wara ya usa en papel. */
+    .plan-brand{border-bottom:1.5px solid #5E8F3C;padding-bottom:4px;margin-bottom:8px}
+    .plan-brand .pn{font-family:'Figtree',sans-serif;font-weight:800;font-size:14px;color:#3F7A12;letter-spacing:.3px}
+    .plan-brand .ps{font-family:'Figtree',sans-serif;font-size:10.5px;color:#333;font-weight:500;margin-top:1px}
     /* Cada sucursal entra entera en una hoja; .solo = no entra ni sola, se deja partir repitiendo el <thead>. */
     .plan-block{break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
     .plan-block.solo{break-inside:auto;page-break-inside:auto}
-    .plan-band{background:#2E5A28;color:#fff;font-family:'Figtree',sans-serif;font-size:12px;font-weight:700;
-      padding:4px 8px;border:1px solid #2E5A28;border-bottom:none;letter-spacing:.2px;
+    .plan-band{background:#5E8F3C;color:#fff;font-family:'Figtree',sans-serif;font-size:12px;font-weight:700;
+      padding:4px 8px;border:1px solid #5E8F3C;border-bottom:none;letter-spacing:.2px;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
     .plan-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-family:'Figtree',sans-serif;font-size:11.5px;line-height:1.25}
     .plan-tab th,.plan-tab td{border:1px solid #555;padding:3px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
@@ -167,6 +168,8 @@
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
     .plan-tab thead{display:table-header-group}
     .plan-tab tr{break-inside:avoid;page-break-inside:avoid}
+    /* Filas alternadas: ayudan a no saltar de renglon al leer una lista larga en papel. */
+    .plan-tab tbody tr:nth-child(even){background:#F4F8EC;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     /* Anchos repartidos para que cada fila entre en UN renglón: la fila mide lo que mide su celda
        más alta, así que tanto el Menú como el Postre tienen que entrar sin partirse. Si tocás estos
        anchos y algo se parte, toda la fila crece y la planilla gana hojas. */
@@ -912,7 +915,7 @@ function imprimirPlanilla(){
   });
   const area=document.getElementById('printArea');
   area.innerHTML=hojas.map(pg=>`<section class="plan-page">
-      <div class="plan-brand"><img src="${LOGO}" alt="Wara"><span class="pn">Wara</span><span class="ps">Planilla de entrega · ${SEMANA}</span></div>
+      <div class="plan-brand"><div class="pn">WARA · Comida saludable · Salta</div><div class="ps">Planilla de entrega — ${pg.d.nombre} — ${SEMANA}</div></div>
       ${pg.bloques.map(b=>planBloqueHTML(b,pg.d)).join('')}
     </section>`).join('')
     ||'<p style="padding:20px">Todavía no hay pedidos cargados.</p>';
