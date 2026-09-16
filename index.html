@@ -151,32 +151,34 @@
        Clases propias (.plan-*) para no tocar el comprobante individual, que sigue usando .ptable/.pblock. */
     .plan-page{page-break-after:always;break-after:page}
     .plan-page:last-child{page-break-after:auto;break-after:auto}
-    .plan-brand{display:flex;align-items:center;gap:8px;border-bottom:1.5px solid #2E5A28;padding-bottom:5px;margin-bottom:10px}
-    .plan-brand img{width:22px;height:22px;border-radius:50%;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .plan-brand .pn{font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:#2E5A28;line-height:1}
-    .plan-brand .ps{margin-left:auto;font-family:'Figtree',sans-serif;font-size:10.5px;color:#444;font-weight:600}
+    .plan-brand{display:flex;align-items:center;gap:7px;border-bottom:1.5px solid #2E5A28;padding-bottom:3px;margin-bottom:7px}
+    .plan-brand img{width:18px;height:18px;border-radius:50%;object-fit:cover;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .plan-brand .pn{font-family:'Fraunces',serif;font-weight:700;font-size:13px;color:#2E5A28;line-height:1}
+    .plan-brand .ps{margin-left:auto;font-family:'Figtree',sans-serif;font-size:10px;color:#444;font-weight:600}
     /* Cada sucursal entra entera en una hoja; .solo = no entra ni sola, se deja partir repitiendo el <thead>. */
-    .plan-block{break-inside:avoid;page-break-inside:avoid;margin-bottom:10px}
+    .plan-block{break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
     .plan-block.solo{break-inside:auto;page-break-inside:auto}
-    .plan-band{background:#2E5A28;color:#fff;font-family:'Figtree',sans-serif;font-size:12.5px;font-weight:700;
-      padding:6px 9px;border:1px solid #2E5A28;border-bottom:none;letter-spacing:.2px;
+    .plan-band{background:#2E5A28;color:#fff;font-family:'Figtree',sans-serif;font-size:12px;font-weight:700;
+      padding:4px 8px;border:1px solid #2E5A28;border-bottom:none;letter-spacing:.2px;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .plan-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-family:'Figtree',sans-serif;font-size:12px}
-    .plan-tab th,.plan-tab td{border:1px solid #555;padding:5px 7px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+    .plan-tab{width:100%;border-collapse:collapse;table-layout:fixed;font-family:'Figtree',sans-serif;font-size:11.5px;line-height:1.25}
+    .plan-tab th,.plan-tab td{border:1px solid #555;padding:3px 6px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
     .plan-tab th{background:#E9F0DC;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#2B2A22;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
     .plan-tab thead{display:table-header-group}
     .plan-tab tr{break-inside:avoid;page-break-inside:avoid}
-    /* Anchos repartidos para que el nombre del plato entre en un solo renglón: la fila mide lo
-       que mide su celda más alta, y el Menú ya usa dos (código + plato). Si el plato se parte,
-       toda la fila crece y la planilla gana hojas. */
-    .plan-tab .k0{width:5%;text-align:center}
-    .plan-tab .k1{width:19%}
-    .plan-tab .k2{width:44%}   /* MENÚ: la más ancha, es la que más texto lleva */
-    .plan-tab .k3{width:17%}
-    .plan-tab .k4{width:15%}
+    /* Anchos repartidos para que cada fila entre en UN renglón: la fila mide lo que mide su celda
+       más alta, así que tanto el Menú como el Postre tienen que entrar sin partirse. Si tocás estos
+       anchos y algo se parte, toda la fila crece y la planilla gana hojas. */
+    .plan-tab .k0{width:4%;text-align:center}
+    .plan-tab .k1{width:18%}
+    .plan-tab .k2{width:45%}   /* MENÚ: la más ancha, es la que más texto lleva */
+    .plan-tab .k3{width:19%}
+    .plan-tab .k4{width:14%}
     .plan-tab .mcode{font-weight:700}
-    .plan-tab .mdish{display:block;font-size:11px;color:#333;font-weight:400;line-height:1.2}
+    /* El plato va en el MISMO renglón que el código: ponerlo en su propia línea duplicaba el alto
+       de todas las filas y era lo que hacía que la planilla ocupara el doble de hojas. */
+    .plan-tab .mdish{font-size:11px;color:#333;font-weight:400}
     .plan-tab .nop{color:#777;font-style:italic}
     .plan-foot{margin-top:7px;font-family:'Figtree',sans-serif;font-size:11.5px;font-weight:600;color:#222;
       break-before:avoid;page-break-before:avoid}
@@ -823,11 +825,11 @@ function copiarRecordatorio(){
    Hoja legal vertical. Las sucursales chicas se agrupan en una misma hoja y las grandes van solas;
    el reparto se calcula por alto estimado, así que no hay sucursales hardcodeadas (si mañana hay
    una cuarta, se acomoda sola). */
-const PLAN_ALTO_HOJA=1200;  // px útiles de una hoja legal (356mm) con margen de 8mm, descontada la franja de marca
-                            // (el real es ~1246; se deja margen para que el caso límite corte prolijo y no a presión)
-const PLAN_ALTO_FIJO=90;    // banda verde + encabezado de tabla + línea de firma de cada bloque
-const PLAN_ALTO_FILA=25;    // fila de una sola línea
-const PLAN_ALTO_LINEA=13;   // cada línea extra que agrega el texto
+const PLAN_ALTO_HOJA=1215;  // px útiles de una hoja legal (356mm) con margen de 8mm, descontada la franja de marca
+                            // (el real es ~1254; se deja margen para que el caso límite corte prolijo y no a presión)
+const PLAN_ALTO_FIJO=78;    // banda verde + encabezado de tabla + línea de firma de cada bloque
+const PLAN_ALTO_FILA=21;    // fila de una sola línea
+const PLAN_ALTO_LINEA=14;   // cada línea extra que agrega el texto
 
 // Alto aproximado de una sucursal, para decidir cómo se reparten las hojas.
 function planAltoBloque(list,d){
@@ -836,10 +838,13 @@ function planAltoBloque(list,d){
     const s=p.dias[d.k];
     h+=PLAN_ALTO_FILA;
     if(!s||s.skip)return;
-    const plato=String((d.platos&&d.platos[s.m])||'');
-    if(plato)h+=PLAN_ALTO_LINEA;                                  // el nombre del plato va en su renglón
-    if(plato.length>58)h+=PLAN_ALTO_LINEA;                        // y si es muy largo se parte en dos
-    if(s.obs&&String(s.obs).length>32)h+=PLAN_ALTO_LINEA;         // una observación larga también estira la fila
+    // Código + plato van juntos en un renglón; solo suma alto si ese texto no entra en la celda.
+    const cat=CATS[s.m]?CATS[s.m].n:'';
+    const menu=String(s.m)+(cat?' · '+cat:'')+' — '+String((d.platos&&d.platos[s.m])||'');
+    if(menu.length>60)h+=PLAN_ALTO_LINEA;
+    if(menu.length>120)h+=PLAN_ALTO_LINEA;
+    if(String(postreTxt(s.p)||'').length>26)h+=PLAN_ALTO_LINEA;   // el postre también puede partirse
+    if(s.obs&&String(s.obs).length>22)h+=PLAN_ALTO_LINEA;
   });
   return h;
 }
@@ -854,7 +859,7 @@ function planBloqueHTML(b,d){
     const cat=CATS[s.m]?CATS[s.m].n:'';
     const plato=(d.platos&&d.platos[s.m])||'';
     return `<tr><td class="k0">${i+1}</td><td class="k1">${p.nombre}</td>`+
-      `<td class="k2"><span class="mcode">${s.m}${cat?' · '+cat:''}</span><span class="mdish">${plato}</span></td>`+
+      `<td class="k2"><span class="mcode">${s.m}${cat?' · '+cat:''}</span>${plato?`<span class="mdish"> — ${plato}</span>`:''}</td>`+
       `<td class="k3">${postreTxt(s.p)}</td><td class="k4">${s.obs||''}</td></tr>`;
   }).join('');
   return `<div class="plan-block${b.sola?' solo':''}">
@@ -877,18 +882,29 @@ function imprimirPlanilla(){
       bloques.push({sec,list,alto:planAltoBloque(list,d)});
     });
     if(!bloques.length)return;
-    // Cada día arranca en hoja nueva. Dentro del día repartimos las sucursales por alto:
-    // se acomodan primero las más grandes y las chicas rellenan lo que queda. Así las chicas
-    // (JURAMENTO + TAVELLA) terminan compartiendo hoja aunque en la planilla no vayan seguidas,
-    // y la grande (PLANTA) se queda con la suya.
-    bloques.forEach((b,i)=>{b.orden=i;});
-    const pags=[];
-    bloques.slice().sort((a,b)=>b.alto-a.alto).forEach(b=>{
-      b.sola=b.alto>PLAN_ALTO_HOJA;                  // no entra ni sola: hoja propia, se deja partir
-      const pg=b.sola?null:pags.find(x=>!x.sola&&x.alto+b.alto<=PLAN_ALTO_HOJA);
-      if(pg){pg.items.push(b);pg.alto+=b.alto;}
-      else pags.push({items:[b],alto:b.alto,sola:b.sola});
-    });
+    // Cada día arranca en hoja nueva. Lo ideal es que el día entero entre en UNA hoja; si no entra,
+    // se reparte de la forma más pareja: cada sucursal grande se lleva su hoja y las chicas se juntan
+    // en otra. Así se evita el caso feo de una hoja entera para una sucursal de una sola fila.
+    bloques.forEach((b,i)=>{b.orden=i;b.sola=false;});
+    const total=bloques.reduce((a,b)=>a+b.alto,0);
+    let pags;
+    if(total<=PLAN_ALTO_HOJA){
+      pags=[{items:bloques.slice()}];                               // el día completo en una hoja
+    }else{
+      pags=[];
+      // La sucursal más grande se lleva una hoja para ella y el resto se agrupa en las que hagan
+      // falta. Es el reparto más parejo y evita que una sucursal de una o dos filas se quede sola
+      // ocupando una hoja entera.
+      const mayor=bloques.reduce((a,b)=>b.alto>a.alto?b:a);
+      mayor.sola=mayor.alto>PLAN_ALTO_HOJA;                         // ni sola entra: se deja partir
+      pags.push({items:[mayor],alto:mayor.alto});
+      let cur=null;
+      bloques.forEach(b=>{
+        if(b===mayor)return;
+        if(cur&&cur.alto+b.alto<=PLAN_ALTO_HOJA){cur.items.push(b);cur.alto+=b.alto;}
+        else{cur={items:[b],alto:b.alto};pags.push(cur);}
+      });
+    }
     // Se imprimen en el orden en que las sucursales aparecen en la planilla, no por tamaño.
     pags.forEach(pg=>pg.items.sort((a,b)=>a.orden-b.orden));
     pags.sort((a,b)=>a.items[0].orden-b.items[0].orden);
